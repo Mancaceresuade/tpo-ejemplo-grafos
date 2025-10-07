@@ -258,4 +258,78 @@ public class GraphService {
         return buildGraph()
                 .map(graph -> graph.getNodesByType("PERSON"));
     }
+    
+    /**
+     * Agrega una nueva película al grafo con sus actores y directores
+     */
+    public Mono<Map<String, Object>> addMovie(String movieTitle, List<String> actorNames, List<String> directorNames) {
+        return buildGraph()
+                .map(graph -> {
+                    try {
+                        // Verificar si la película ya existe
+                        if (graph.getAllNodes().contains(movieTitle)) {
+                            return Map.of(
+                                "success", false, 
+                                "message", "La película '" + movieTitle + "' ya existe en el grafo"
+                            );
+                        }
+                        
+                        // Agregar el nodo de la película
+                        graph.addNode(movieTitle, "MOVIE");
+                        
+                        int addedActorRelations = 0;
+                        int addedDirectorRelations = 0;
+                        
+                        // Agregar relaciones con actores
+                        if (actorNames != null) {
+                            for (String actorName : actorNames) {
+                                if (graph.getAllNodes().contains(actorName)) {
+                                    // El actor existe, agregar la relación
+                                    graph.addEdge(actorName, movieTitle, "ACTED_IN");
+                                    graph.addEdge(movieTitle, actorName, "ACTED_BY");
+                                    addedActorRelations++;
+                                }
+                            }
+                        }
+                        
+                        // Agregar relaciones con directores
+                        if (directorNames != null) {
+                            for (String directorName : directorNames) {
+                                if (graph.getAllNodes().contains(directorName)) {
+                                    // El director existe, agregar la relación
+                                    graph.addEdge(directorName, movieTitle, "DIRECTED");
+                                    graph.addEdge(movieTitle, directorName, "DIRECTED_BY");
+                                    addedDirectorRelations++;
+                                }
+                            }
+                        }
+                        
+                        int totalRelations = addedActorRelations + addedDirectorRelations;
+                        
+                        if (totalRelations == 0) {
+                            // Si no se agregaron relaciones, remover el nodo de la película
+                            graph.getAllNodes().remove(movieTitle);
+                            return Map.of(
+                                "success", false,
+                                "message", "No se encontraron actores o directores válidos. La película no fue agregada."
+                            );
+                        }
+                        
+                        return Map.of(
+                            "success", true,
+                            "message", String.format("Película '%s' agregada exitosamente con %d actores y %d directores", 
+                                movieTitle, addedActorRelations, addedDirectorRelations),
+                            "movieTitle", movieTitle,
+                            "addedActorRelations", addedActorRelations,
+                            "addedDirectorRelations", addedDirectorRelations
+                        );
+                        
+                    } catch (Exception e) {
+                        return Map.of(
+                            "success", false,
+                            "message", "Error agregando película: " + e.getMessage()
+                        );
+                    }
+                });
+    }
 }

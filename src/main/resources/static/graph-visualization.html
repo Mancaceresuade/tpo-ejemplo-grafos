@@ -286,6 +286,29 @@
                 </div>
                 
                 <button class="btn" onclick="addNewActor()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">➕ Agregar Actor</button>
+                
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #e1e5e9;">
+                
+                <div class="control-group">
+                    <label for="new-movie-title">Agregar Nueva Película:</label>
+                    <input type="text" id="new-movie-title" placeholder="Título de la película">
+                </div>
+                
+                <div class="control-group">
+                    <label for="actor-selection">Actores:</label>
+                    <div id="actor-selection" style="max-height: 120px; overflow-y: auto; border: 2px solid #e1e5e9; border-radius: 6px; padding: 10px; background: #fff;">
+                        <div style="text-align: center; color: #666; font-style: italic;">Cargando actores...</div>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="director-selection">Directores:</label>
+                    <div id="director-selection" style="max-height: 120px; overflow-y: auto; border: 2px solid #e1e5e9; border-radius: 6px; padding: 10px; background: #fff;">
+                        <div style="text-align: center; color: #666; font-style: italic;">Cargando directores...</div>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="addNewMovie()" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">🎬 Agregar Película</button>
             </div>
 
             <div class="info-panel">
@@ -791,6 +814,36 @@
             }
         }
 
+        // Cargar lista de actores
+        async function loadActors() {
+            try {
+                const response = await fetch('/graph/actors');
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const actors = await response.json();
+                const actorSelection = document.getElementById('actor-selection');
+                
+                if (actors.length === 0) {
+                    actorSelection.innerHTML = '<div style="text-align: center; color: #666; font-style: italic;">No hay actores disponibles</div>';
+                    return;
+                }
+                
+                actorSelection.innerHTML = actors.map(actor => `
+                    <div class="movie-checkbox">
+                        <input type="checkbox" id="actor-${actor.replace(/[^a-zA-Z0-9]/g, '_')}" value="${actor}">
+                        <label for="actor-${actor.replace(/[^a-zA-Z0-9]/g, '_')}">${actor}</label>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error cargando actores:', error);
+                document.getElementById('actor-selection').innerHTML = 
+                    '<div style="text-align: center; color: #dc3545; font-style: italic;">Error cargando actores</div>';
+            }
+        }
+
         // Agregar nuevo actor
         async function addNewActor() {
             const actorName = document.getElementById('new-actor-name').value.trim();
@@ -833,9 +886,10 @@
                     document.getElementById('new-actor-name').value = '';
                     document.querySelectorAll('#movie-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
                     
-                    // Recargar el grafo para mostrar los cambios
+                    // Recargar el grafo y las listas para mostrar los cambios
                     setTimeout(() => {
                         loadGraph();
+                        loadActors();
                     }, 1000);
                     
                 } else {
@@ -845,6 +899,68 @@
             } catch (error) {
                 console.error('Error agregando actor:', error);
                 showMessage(`Error agregando actor: ${error.message}`, 'error');
+            }
+        }
+
+        // Agregar nueva película
+        async function addNewMovie() {
+            const movieTitle = document.getElementById('new-movie-title').value.trim();
+            const actorCheckboxes = document.querySelectorAll('#actor-selection input[type="checkbox"]:checked');
+            const directorCheckboxes = document.querySelectorAll('#director-selection input[type="checkbox"]:checked');
+            
+            if (!movieTitle) {
+                showMessage('Por favor ingresa el título de la película', 'error');
+                return;
+            }
+            
+            if (actorCheckboxes.length === 0 && directorCheckboxes.length === 0) {
+                showMessage('Por favor selecciona al menos un actor o director', 'error');
+                return;
+            }
+            
+            const selectedActors = Array.from(actorCheckboxes).map(cb => cb.value);
+            const selectedDirectors = Array.from(directorCheckboxes).map(cb => cb.value);
+            
+            try {
+                const response = await fetch('/graph/add-movie', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        movieTitle: movieTitle,
+                        actorNames: selectedActors,
+                        directorNames: selectedDirectors
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    
+                    // Limpiar formulario
+                    document.getElementById('new-movie-title').value = '';
+                    document.querySelectorAll('#actor-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
+                    document.querySelectorAll('#director-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
+                    
+                    // Recargar el grafo y las listas para mostrar los cambios
+                    setTimeout(() => {
+                        loadGraph();
+                        loadMovies();
+                    }, 1000);
+                    
+                } else {
+                    showMessage(result.message, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error agregando película:', error);
+                showMessage(`Error agregando película: ${error.message}`, 'error');
             }
         }
 
@@ -860,10 +976,11 @@
                 try {
                     initCytoscape();
                     
-                    // Cargar el grafo y las películas después de un pequeño delay
+                    // Cargar el grafo y las listas después de un pequeño delay
                     setTimeout(() => {
                         loadGraph();
                         loadMovies();
+                        loadActors();
                     }, 500);
                     
                 } catch (error) {

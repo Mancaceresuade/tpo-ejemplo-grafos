@@ -171,4 +171,26 @@ public class GraphController {
     public Mono<List<String>> getAllActors() {
         return graphService.getAllActors();
     }
+    
+    /**
+     * Agrega una nueva película al grafo
+     */
+    @PostMapping("/add-movie")
+    public Mono<Map<String, Object>> addMovie(@RequestBody Map<String, Object> request) {
+        String movieTitle = (String) request.get("movieTitle");
+        @SuppressWarnings("unchecked")
+        List<String> actorNames = (List<String>) request.get("actorNames");
+        @SuppressWarnings("unchecked")
+        List<String> directorNames = (List<String>) request.get("directorNames");
+        
+        if (movieTitle == null || movieTitle.trim().isEmpty()) {
+            return Mono.just(Map.of("success", false, "message", "El título de la película es requerido"));
+        }
+        
+        if ((actorNames == null || actorNames.isEmpty()) && (directorNames == null || directorNames.isEmpty())) {
+            return Mono.just(Map.of("success", false, "message", "Debe especificar al menos un actor o director"));
+        }
+        
+        return graphService.addMovie(movieTitle.trim(), actorNames, directorNames);
+    }
 }
